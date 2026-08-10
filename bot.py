@@ -688,7 +688,7 @@ async def clear(
         )
         return
 
-    await interaction.response.defer(ephemeral=True)
+    await interaction.response.defer(ephemeral=False)
 
     messages = []
 
@@ -704,7 +704,7 @@ async def clear(
 
     await interaction.followup.send(
         f"🧹 Deleted **{len(messages)} message(s)** from **{member}**.",
-        ephemeral=True
+        ephemeral=False
     )
 
 
