@@ -664,6 +664,51 @@ async def server_icon(
 
 
 # --------------------------------------------------
+# /clear
+# --------------------------------------------------
+
+@bot.tree.command(
+    name="clear",
+    description="Clear messages from a specified member"
+)
+@app_commands.describe(
+    amount="Amount of messages to delete (1-20)",
+    member="Member whose messages will be deleted"
+)
+@app_commands.checks.has_permissions(manage_messages=True)
+async def clear(
+    interaction: discord.Interaction,
+    amount: int,
+    member: discord.Member
+):
+    if amount < 1 or amount > 20:
+        await interaction.response.send_message(
+            "❌ You can only delete between **1 and 20 messages**.",
+            ephemeral=True
+        )
+        return
+
+    await interaction.response.defer(ephemeral=True)
+
+    messages = []
+
+    async for message in interaction.channel.history(limit=100):
+        if message.author.id == member.id:
+            messages.append(message)
+
+            if len(messages) >= amount:
+                break
+
+    for message in messages:
+        await message.delete()
+
+    await interaction.followup.send(
+        f"🧹 Deleted **{len(messages)} message(s)** from **{member}**.",
+        ephemeral=True
+    )
+
+
+# --------------------------------------------------
 # ERROR HANDLER
 # --------------------------------------------------
 
