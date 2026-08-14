@@ -123,6 +123,12 @@ async def say_text(
     text: str,
     color: Optional[app_commands.Choice[str]] = None
 ):
+    allowed_mentions = discord.AllowedMentions(
+        users=True,
+        roles=True,
+        everyone=True
+    )
+
     if color:
         colors = {
             "blue": discord.Color.blue(),
@@ -135,10 +141,16 @@ async def say_text(
             color=colors[color.value]
         )
 
-        await interaction.channel.send(embed=embed)
+        await interaction.channel.send(
+            embed=embed,
+            allowed_mentions=allowed_mentions
+        )
 
     else:
-        await interaction.channel.send(text)
+        await interaction.channel.send(
+            text,
+            allowed_mentions=allowed_mentions
+        )
 
     await interaction.response.send_message(
         "Message sent.",
@@ -237,28 +249,10 @@ async def warn(
     user: discord.Member,
     rule_broken: str
 ):
-    embed = discord.Embed(
-        title="⚠️ Warning",
-        description=f"You received a warning in **{interaction.guild.name}**.",
-        color=discord.Color.orange()
-    )
-
-    embed.add_field(
-        name="Rule broken",
-        value=rule_broken,
-        inline=False
-    )
-
-    try:
-        await user.send(embed=embed)
-        dm_status = "The user was notified in DM."
-    except discord.Forbidden:
-        dm_status = "I could not DM the user."
-
     await interaction.response.send_message(
         f"⚠️ {user.mention} has been warned.\n"
-        f"**Rule:** {rule_broken}\n"
-        f"{dm_status}"
+        f"**Rule broken:** {rule_broken}",
+        allowed_mentions=discord.AllowedMentions(users=True)
     )
 
 
