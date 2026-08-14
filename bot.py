@@ -125,8 +125,8 @@ async def say_text(
 ):
     allowed_mentions = discord.AllowedMentions(
         users=True,
-        roles=True,
-        everyone=True
+        roles=False,
+        everyone=False
     )
 
     if color:
