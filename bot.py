@@ -209,11 +209,11 @@ async def edit_message(
             )
             return
 
-	    allowed_mentions = discord.AllowedMentions(
-               users=True,
-               roles=False,
-               everyone=False
-            )
+	allowed_mentions = discord.AllowedMentions(
+            users=True,
+            roles=False,
+            everyone=False
+        )
 
         await message.edit(
            content=text,
