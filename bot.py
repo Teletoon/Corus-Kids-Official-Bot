@@ -109,7 +109,7 @@ say_group = app_commands.Group(
 
 @say_group.command(
     name="text",
-    description="Send a text message"
+    description="Send a text message."
 )
 @app_commands.describe(
     text="Message to send",
@@ -168,7 +168,7 @@ async def say_text(
 
 @say_group.command(
     name="image",
-    description="Send an image"
+    description="Send an image."
 )
 async def say_image(
     interaction: discord.Interaction,
@@ -262,7 +262,7 @@ class EditMessageModal(discord.ui.Modal):
 
 @bot.tree.command(
     name="edit-message",
-    description="Edit a message sent by the bot"
+    description="Edit a message sent by the bot."
 )
 async def edit_message(
     interaction: discord.Interaction,
@@ -308,7 +308,7 @@ async def edit_message(
 
 @bot.tree.command(
     name="warn",
-    description="Warn a user about a rule they broke"
+    description="Warn a user about a rule they broke."
 )
 @app_commands.checks.has_permissions(moderate_members=True)
 async def warn(
@@ -340,11 +340,11 @@ async def warn(
 
 @bot.tree.command(
     name="timeout",
-    description="Timeout a user for up to 1 week"
+    description="Timeout a user for up to 1 week."
 )
 @app_commands.describe(
     user="User to timeout",
-    duration="Duration (max 30 days): s=seconds, m=minutes, h=hours, d=days, w=weeks",
+    duration="Duration (max 1 week): s=seconds, m=minutes, h=hours, d=days, w=weeks",
     reason="Reason for the timeout (optional)"
 )
 @app_commands.checks.has_permissions(moderate_members=True)
@@ -404,7 +404,7 @@ async def timeout(
 
 @bot.tree.command(
     name="remove-timeout",
-    description="Remove a user's timeout"
+    description="Remove a user's timeout."
 )
 @app_commands.checks.has_permissions(moderate_members=True)
 async def remove_timeout(
@@ -454,7 +454,7 @@ async def remove_timeout(
 )
 @bot.tree.command(
     name="jail",
-    description="Jail a user to Cow Jail or Donkey Jail"
+    description="Jail a user to Cow Jail or Donkey Jail."
 )
 @app_commands.describe(
     user="User to jail",
@@ -609,7 +609,7 @@ async def jail(
 
 @bot.tree.command(
     name="kick",
-    description="Kick a user from the server"
+    description="Kick a user from the server."
 )
 @app_commands.checks.has_permissions(kick_members=True)
 async def kick(
@@ -647,7 +647,7 @@ async def kick(
 
 @bot.tree.command(
     name="ban",
-    description="Ban a user"
+    description="Ban a user."
 )
 @app_commands.describe(
     user="User to ban",
@@ -706,7 +706,7 @@ async def ban(
 
 @bot.tree.command(
     name="unban",
-    description="Unban a user by their Discord user ID"
+    description="Unban a user by their Discord user ID."
 )
 @app_commands.checks.has_permissions(ban_members=True)
 async def unban(
@@ -755,7 +755,7 @@ async def unban(
 
 @bot.tree.command(
     name="avatar",
-    description="Show a user's avatar"
+    description="Show a user's avatar."
 )
 async def avatar(
     interaction: discord.Interaction,
@@ -781,7 +781,7 @@ async def avatar(
 
 @bot.tree.command(
     name="server-icon",
-    description="Show the server icon"
+    description="Show the server icon."
 )
 async def server_icon(
     interaction: discord.Interaction
@@ -811,7 +811,7 @@ async def server_icon(
 
 @bot.tree.command(
     name="clear",
-    description="Clear messages from a specified member"
+    description="Clear messages from a specified member."
 )
 @app_commands.describe(
     amount="Amount of messages to delete (1-20)",
@@ -856,7 +856,7 @@ async def clear(
 
 @bot.tree.command(
     name="help",
-    description="Show all Corus Kids Bot commands"
+    description="Show all Corus Kids Bot commands."
 )
 async def help_command(
     interaction: discord.Interaction
@@ -898,8 +898,8 @@ async def help_command(
     embed.add_field(
         name="👤 Server & User",
         value=(
+	    "**/server-icon** — Show the server's icon."
             "**/avatar** — Show a user's avatar.\n"
-            "**/server-icon** — Show the server's icon."
         ),
         inline=False
     )
