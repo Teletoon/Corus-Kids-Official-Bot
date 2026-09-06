@@ -201,10 +201,18 @@ class EditMessageModal(discord.ui.Modal):
 
         self.message = message
 
+        # Coloured embed message
+        if message.embeds and message.embeds[0].description:
+            current_text = message.embeds[0].description
+
+        # Normal text message
+        else:
+            current_text = message.content
+
         self.text_input = discord.ui.TextInput(
             label="Message",
             style=discord.TextStyle.paragraph,
-            default=message.content,
+            default=current_text,
             required=True,
             max_length=2000
         )
@@ -221,10 +229,30 @@ class EditMessageModal(discord.ui.Modal):
             everyone=False
         )
 
-        await self.message.edit(
-            content=self.text_input.value,
-            allowed_mentions=allowed_mentions
-        )
+        new_text = self.text_input.value
+
+        # If the bot message uses an embed,
+        # edit the embed instead of adding normal text above it.
+        if self.message.embeds:
+            old_embed = self.message.embeds[0]
+
+            new_embed = discord.Embed(
+                description=new_text,
+                color=old_embed.color
+            )
+
+            await self.message.edit(
+                content=None,
+                embed=new_embed,
+                allowed_mentions=allowed_mentions
+            )
+
+        # Normal message
+        else:
+            await self.message.edit(
+                content=new_text,
+                allowed_mentions=allowed_mentions
+            )
 
         await interaction.response.send_message(
             "Message edited.",
@@ -273,7 +301,6 @@ async def edit_message(
             "Invalid message ID.",
             ephemeral=True
         )
-
 
 # --------------------------------------------------
 # /warn
