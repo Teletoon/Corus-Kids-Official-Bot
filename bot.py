@@ -107,6 +107,70 @@ say_group = app_commands.Group(
 # /say text
 # --------------------------------------------------
 
+class SayTextModal(discord.ui.Modal):
+    def __init__(
+        self,
+        channel,
+        color: Optional[app_commands.Choice[str]] = None
+    ):
+        super().__init__(
+            title="Send Message"
+        )
+
+        self.channel = channel
+        self.color = color
+
+        self.text_input = discord.ui.TextInput(
+            label="Message",
+            style=discord.TextStyle.paragraph,
+            placeholder="Write your message here...",
+            required=True,
+            max_length=2000
+        )
+
+        self.add_item(self.text_input)
+
+    async def on_submit(
+        self,
+        interaction: discord.Interaction
+    ):
+        allowed_mentions = discord.AllowedMentions(
+            users=True,
+            roles=False,
+            everyone=False
+        )
+
+        text = self.text_input.value
+
+        if self.color:
+            colors = {
+                "blue": discord.Color.blue(),
+                "red": discord.Color.red(),
+                "green": discord.Color.green()
+            }
+
+            embed = discord.Embed(
+                description=text,
+                color=colors[self.color.value]
+            )
+
+            await self.channel.send(
+                embed=embed,
+                allowed_mentions=allowed_mentions
+            )
+
+        else:
+            await self.channel.send(
+                text,
+                allowed_mentions=allowed_mentions
+            )
+
+        await interaction.response.send_message(
+            "Message sent.",
+            ephemeral=True
+        )
+
+
 @say_group.command(
     name="text",
     description="Send a text message"
@@ -120,42 +184,14 @@ say_group = app_commands.Group(
 )
 async def say_text(
     interaction: discord.Interaction,
-    text: str,
     color: Optional[app_commands.Choice[str]] = None
 ):
-    allowed_mentions = discord.AllowedMentions(
-        users=True,
-        roles=False,
-        everyone=False
+    modal = SayTextModal(
+        interaction.channel,
+        color
     )
 
-    if color:
-        colors = {
-            "blue": discord.Color.blue(),
-            "red": discord.Color.red(),
-            "green": discord.Color.green()
-        }
-
-        embed = discord.Embed(
-            description=text,
-            color=colors[color.value]
-        )
-
-        await interaction.channel.send(
-            embed=embed,
-            allowed_mentions=allowed_mentions
-        )
-
-    else:
-        await interaction.channel.send(
-            text,
-            allowed_mentions=allowed_mentions
-        )
-
-    await interaction.response.send_message(
-        "Message sent.",
-        ephemeral=True
-    )
+    await interaction.response.send_modal(modal)
 
 
 # --------------------------------------------------
@@ -184,9 +220,49 @@ async def say_image(
 
 bot.tree.add_command(say_group)
 
+
 # --------------------------------------------------
 # /edit-message
 # --------------------------------------------------
+
+class EditMessageModal(discord.ui.Modal):
+    def __init__(self, message: discord.Message):
+        super().__init__(
+            title="Edit Message"
+        )
+
+        self.message = message
+
+        self.text_input = discord.ui.TextInput(
+            label="Message",
+            style=discord.TextStyle.paragraph,
+            default=message.content,
+            required=True,
+            max_length=2000
+        )
+
+        self.add_item(self.text_input)
+
+    async def on_submit(
+        self,
+        interaction: discord.Interaction
+    ):
+        allowed_mentions = discord.AllowedMentions(
+            users=True,
+            roles=False,
+            everyone=False
+        )
+
+        await self.message.edit(
+            content=self.text_input.value,
+            allowed_mentions=allowed_mentions
+        )
+
+        await interaction.response.send_message(
+            "Message edited.",
+            ephemeral=True
+        )
+
 
 @bot.tree.command(
     name="edit-message",
@@ -194,8 +270,7 @@ bot.tree.add_command(say_group)
 )
 async def edit_message(
     interaction: discord.Interaction,
-    message_id: str,
-    text: str
+    message_id: str
 ):
     try:
         message = await interaction.channel.fetch_message(
@@ -209,21 +284,9 @@ async def edit_message(
             )
             return
 
-        allowed_mentions = discord.AllowedMentions(
-            users=True,
-            roles=False,
-            everyone=False
-        )
+        modal = EditMessageModal(message)
 
-        await message.edit(
-            content=text,
-            allowed_mentions=allowed_mentions
-        )
-
-        await interaction.response.send_message(
-            "Message edited.",
-            ephemeral=True
-        )
+        await interaction.response.send_modal(modal)
 
     except discord.NotFound:
         await interaction.response.send_message(
@@ -258,10 +321,21 @@ async def warn(
     user: discord.Member,
     rule_broken: str
 ):
+    # Private confirmation to the moderator
     await interaction.response.send_message(
+        "Warning sent.",
+        ephemeral=True
+    )
+
+    # Public warning from the bot itself
+    await interaction.channel.send(
         f"⚠️ {user.mention} has been warned.\n"
         f"**Rule broken:** {rule_broken}",
-        allowed_mentions=discord.AllowedMentions(users=True)
+        allowed_mentions=discord.AllowedMentions(
+            users=True,
+            roles=False,
+            everyone=False
+        )
     )
 
 
@@ -304,10 +378,22 @@ async def timeout(
             reason=reason
         )
 
+        # Private confirmation
         await interaction.response.send_message(
+            "Timeout applied.",
+            ephemeral=True
+        )
+
+        # Public message from CK Bot
+        await interaction.channel.send(
             f"⏱️ {user.mention} is timed out. "
             f"**{duration}**.\n"
-            f"Reason: {reason or 'No reason provided.'}"
+            f"Reason: {reason or 'No reason provided.'}",
+            allowed_mentions=discord.AllowedMentions(
+                users=True,
+                roles=False,
+                everyone=False
+            )
         )
 
     except discord.Forbidden:
@@ -331,8 +417,20 @@ async def remove_timeout(
     user: discord.Member
 ):
     try:
+        # Actually remove the timeout
+        await user.timeout(
+            None,
+            reason=f"Timeout removed by {interaction.user}"
+        )
 
+        # Private confirmation
         await interaction.response.send_message(
+            "Timeout removed.",
+            ephemeral=True
+        )
+
+        # Public message from CK Bot
+        await interaction.channel.send(
             f"✅ **{user}** has been removed from timeout."
         )
 
@@ -386,7 +484,8 @@ async def jail(
 
     if seconds is None:
         await interaction.response.send_message(
-            "Invalid duration. Use `30s`, `10m`, `2h`, `3d`, `1w`, etc. Maximum jail time is 30 days.",
+            "Invalid duration. Use `30s`, `10m`, `2h`, `3d`, `1w`, etc. "
+            "Maximum jail time is 30 days.",
             ephemeral=True
         )
         return
@@ -421,26 +520,48 @@ async def jail(
         if verified in user.roles:
             await user.remove_roles(
                 verified,
-                reason=f"Jailed by {interaction.user}: {reason or 'No reason provided'}"
+                reason=(
+                    f"Jailed by {interaction.user}: "
+                    f"{reason or 'No reason provided'}"
+                )
             )
 
         # Remove existing jail roles
         if baqara and baqara in user.roles:
-            await user.remove_roles(baqara)
+            await user.remove_roles(
+                baqara
+            )
 
         if himarroon and himarroon in user.roles:
-            await user.remove_roles(himarroon)
+            await user.remove_roles(
+                himarroon
+            )
 
         # Add selected jail role
         await user.add_roles(
             jail_role,
-            reason=f"Sent to {jail_name} by {interaction.user}: {reason or 'No reason provided'}"
+            reason=(
+                f"Sent to {jail_name} by {interaction.user}: "
+                f"{reason or 'No reason provided'}"
+            )
         )
 
+        # Private confirmation to the moderator
         await interaction.response.send_message(
+            "User jailed.",
+            ephemeral=True
+        )
+
+        # Public announcement from CK Bot
+        await interaction.channel.send(
             f"⛓️ {user.mention} is jailed to **{jail_name}**.\n"
-            f" Duration: **{duration}**\n"
-            f" Reason: **{reason or 'No reason provided'}**"
+            f"Duration: **{duration}**\n"
+            f"Reason: **{reason or 'No reason provided'}**",
+            allowed_mentions=discord.AllowedMentions(
+                users=True,
+                roles=False,
+                everyone=False
+            )
         )
 
         # Wait until jail duration expires
@@ -502,10 +623,19 @@ async def kick(
     reason: Optional[str] = None
 ):
     try:
+        user_name = str(user)
+
         await user.kick(reason=reason)
 
+        # Private confirmation to the moderator
         await interaction.response.send_message(
-            f"🦿 **{user}** is kicked.\n"
+            "User kicked.",
+            ephemeral=True
+        )
+
+        # Public announcement from CK Bot
+        await interaction.channel.send(
+            f"🦿 **{user_name}** is kicked.\n"
             f"Reason: {reason or 'No reason provided.'}"
         )
 
@@ -522,7 +652,7 @@ async def kick(
 
 @bot.tree.command(
     name="ban",
-    description="Ban an user"
+    description="Ban a user"
 )
 @app_commands.describe(
     user="User to ban",
@@ -548,20 +678,24 @@ async def ban(
     delete_seconds = delete_messages.value if delete_messages else 0
 
     try:
+        # Save username before banning
+        user_name = str(user)
+
         await user.ban(
             reason=reason,
             delete_message_seconds=delete_seconds
         )
 
-        delete_text = (
-            delete_messages.name
-            if delete_messages
-            else "Don't delete messages"
+        # Private confirmation to the moderator
+        await interaction.response.send_message(
+            "User banned.",
+            ephemeral=True
         )
 
-        await interaction.response.send_message(
-            f"🚫 **{user}** is banned.\n"
-            f"Reason: **{reason}**\n"
+        # Public announcement from CK Bot
+        await interaction.channel.send(
+            f"🚫 **{user_name}** is banned.\n"
+            f"Reason: **{reason}**"
         )
 
     except discord.Forbidden:
@@ -587,7 +721,17 @@ async def unban(
     try:
         user = await bot.fetch_user(int(user_id))
 
+        # Actually unban the user
+        await interaction.guild.unban(user)
+
+        # Private confirmation to the moderator
         await interaction.response.send_message(
+            "User unbanned.",
+            ephemeral=True
+        )
+
+        # Public announcement from CK Bot
+        await interaction.channel.send(
             f"✅ **{user}** has been unbanned."
         )
 
@@ -709,6 +853,843 @@ async def clear(
         f"🧹 Deleted **{len(messages)} message(s)** from **{member}**.",
         ephemeral=False
     )
+
+
+# --------------------------------------------------
+# /help
+# --------------------------------------------------
+
+@bot.tree.command(
+    name="help",
+    description="Show all Corus Kids Bot commands"
+)
+async def help_command(
+    interaction: discord.Interaction
+):
+    embed = discord.Embed(
+        title="🤖 Corus Kids Official Bot — Help",
+        description=(
+            "Here is the list of available Corus Kids Bot commands.\n"
+            "Some moderation commands require staff permissions."
+        ),
+        color=discord.Color.blue()
+    )
+
+    embed.add_field(
+        name="💬 Messages",
+        value=(
+            "**/say text** — Send a message through Corus Kids Bot.\n"
+            "**/say image** — Send an image through Corus Kids Bot.\n"
+            "**/edit-message** — Edit a message previously sent by Corus Kids Bot."
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="🛡️ Moderation",
+        value=(
+            "**/warn** — Warn a member for breaking a rule.\n"
+            "**/timeout** — Timeout a member for up to 1 week.\n"
+            "**/remove-timeout** — Remove a member's timeout.\n"
+            "**/jail** — Jail a member to Cow Jail or Donkey Jail up to 30 days.\n"
+            "**/kick** — Kick a member from the server.\n"
+            "**/ban** — Ban a member from the server.\n"
+            "**/unban** — Unban a member using their Discord user ID.\n"
+            "**/clear** — Delete 1–20 messages from a selected member."
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="👤 Server & User",
+        value=(
+            "**/avatar** — Show a user's avatar.\n"
+            "**/server-icon** — Show the server's icon."
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="🎨 Colour Games",
+        value=(
+            "**/game colour** — Mix 2 or 3 colours using "
+            "Additive RGB or Subtractive CMY."
+        ),
+        inline=False
+    )
+
+    embed.set_footer(
+        text="Corus Kids Official Bot • Corus Kids Bot"
+    )
+
+    await interaction.response.send_message(
+        embed=embed
+    )
+
+
+# ==================================================
+# /game colour
+# ==================================================
+
+game_group = app_commands.Group(
+    name="game",
+    description="Play Corus Kids Bot games"
+)
+
+
+# --------------------------------------------------
+# Colour calculation
+# --------------------------------------------------
+
+def hex_to_rgb(hex_value: str):
+    value = hex_value.strip().upper()
+
+    if value.startswith("#"):
+        value = value[1:]
+
+    if len(value) != 6:
+        return None
+
+    try:
+        r = int(value[0:2], 16)
+        g = int(value[2:4], 16)
+        b = int(value[4:6], 16)
+
+        return (r, g, b)
+
+    except ValueError:
+        return None
+
+
+def rgb_to_hex(rgb):
+    r, g, b = rgb
+    return f"#{r:02X}{g:02X}{b:02X}"
+
+
+def mix_additive(colours):
+    """
+    Additive RGB mixing.
+
+    Red + Green = Yellow
+    Green + Blue = Cyan
+    Red + Blue = Magenta
+    Red + Green + Blue = White
+    """
+
+    r = min(255, sum(colour[0] for colour in colours))
+    g = min(255, sum(colour[1] for colour in colours))
+    b = min(255, sum(colour[2] for colour in colours))
+
+    return (r, g, b)
+
+
+def mix_subtractive(colours):
+    """
+    Subtractive CMY mixing.
+
+    Cyan + Yellow = Green
+    Cyan + Magenta = Blue
+    Magenta + Yellow = Red
+    Cyan + Magenta + Yellow = Black
+    """
+
+    cyan_total = 0
+    magenta_total = 0
+    yellow_total = 0
+
+    for r, g, b in colours:
+        cyan_total += 255 - r
+        magenta_total += 255 - g
+        yellow_total += 255 - b
+
+    cyan_total = min(255, cyan_total)
+    magenta_total = min(255, magenta_total)
+    yellow_total = min(255, yellow_total)
+
+    r = 255 - cyan_total
+    g = 255 - magenta_total
+    b = 255 - yellow_total
+
+    return (r, g, b)
+
+
+def colour_name(rgb):
+    known_colours = {
+        (255, 0, 0): "Red 🔴",
+        (0, 255, 0): "Green 🟢",
+        (0, 0, 255): "Blue 🔵",
+
+        (0, 255, 255): "Cyan 🩵",
+        (255, 0, 255): "Magenta 🟣",
+        (255, 255, 0): "Yellow 🟡",
+
+        (255, 255, 255): "White ⚪",
+        (0, 0, 0): "Black ⚫"
+    }
+
+    return known_colours.get(rgb, "Custom Colour 🎨")
+
+
+# --------------------------------------------------
+# Base game view
+# --------------------------------------------------
+
+class ColourGameView(discord.ui.View):
+    def __init__(self, player_id: int):
+        super().__init__(timeout=180)
+        self.player_id = player_id
+
+    async def interaction_check(
+        self,
+        interaction: discord.Interaction
+    ):
+        if interaction.user.id != self.player_id:
+            await interaction.response.send_message(
+                "This colour game belongs to another player.",
+                ephemeral=True
+            )
+            return False
+
+        return True
+
+
+# --------------------------------------------------
+# Choose RGB or CMY
+# --------------------------------------------------
+
+class ColourModelView(ColourGameView):
+    @discord.ui.button(
+        label="Additive RGB",
+        emoji="🌈",
+        style=discord.ButtonStyle.primary
+    )
+    async def additive(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        embed = discord.Embed(
+            title="🎨 Colour Mix — Additive RGB",
+            description=(
+                "Choose how many colours you want to mix.\n\n"
+                "🔴 Red\n"
+                "🟢 Green\n"
+                "🔵 Blue\n"
+                "🎨 Custom HEX\n\n"
+                "**The same colour can be selected more than once.**"
+            ),
+            color=discord.Color.blue()
+        )
+
+        await interaction.response.edit_message(
+            embed=embed,
+            view=ColourAmountView(
+                self.player_id,
+                mode="additive"
+            )
+        )
+
+    @discord.ui.button(
+        label="Subtractive CMY",
+        emoji="🎨",
+        style=discord.ButtonStyle.secondary
+    )
+    async def subtractive(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        embed = discord.Embed(
+            title="🎨 Colour Mix — Subtractive CMY",
+            description=(
+                "Choose how many colours you want to mix.\n\n"
+                "🩵 Cyan\n"
+                "🟣 Magenta\n"
+                "🟡 Yellow\n"
+                "🎨 Custom HEX\n\n"
+                "**The same colour can be selected more than once.**"
+            ),
+            color=discord.Color.magenta()
+        )
+
+        await interaction.response.edit_message(
+            embed=embed,
+            view=ColourAmountView(
+                self.player_id,
+                mode="subtractive"
+            )
+        )
+
+
+# --------------------------------------------------
+# Choose 2 or 3 colours
+# --------------------------------------------------
+
+class ColourAmountView(ColourGameView):
+    def __init__(
+        self,
+        player_id: int,
+        mode: str
+    ):
+        super().__init__(player_id)
+        self.mode = mode
+
+    @discord.ui.button(
+        label="2 Colours",
+        emoji="2️⃣",
+        style=discord.ButtonStyle.success
+    )
+    async def two_colours(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        await start_colour_selection(
+            interaction,
+            self.player_id,
+            self.mode,
+            2
+        )
+
+    @discord.ui.button(
+        label="3 Colours",
+        emoji="3️⃣",
+        style=discord.ButtonStyle.success
+    )
+    async def three_colours(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        await start_colour_selection(
+            interaction,
+            self.player_id,
+            self.mode,
+            3
+        )
+
+
+async def start_colour_selection(
+    interaction,
+    player_id,
+    mode,
+    amount
+):
+    embed = make_selection_embed(
+        mode,
+        amount,
+        []
+    )
+
+    await interaction.response.edit_message(
+        embed=embed,
+        view=ColourSelectionView(
+            player_id,
+            mode,
+            amount,
+            []
+        )
+    )
+
+
+# --------------------------------------------------
+# Colour selection menu
+# --------------------------------------------------
+
+class ColourSelect(discord.ui.Select):
+    def __init__(
+        self,
+        player_id,
+        mode,
+        amount,
+        selected_colours
+    ):
+        self.player_id = player_id
+        self.mode = mode
+        self.amount = amount
+        self.selected_colours = selected_colours
+
+        number = len(selected_colours) + 1
+
+        if mode == "additive":
+            options = [
+                discord.SelectOption(
+                    label="Red",
+                    value="red",
+                    emoji="🔴",
+                    description="#FF0000"
+                ),
+                discord.SelectOption(
+                    label="Green",
+                    value="green",
+                    emoji="🟢",
+                    description="#00FF00"
+                ),
+                discord.SelectOption(
+                    label="Blue",
+                    value="blue",
+                    emoji="🔵",
+                    description="#0000FF"
+                ),
+                discord.SelectOption(
+                    label="Custom HEX",
+                    value="custom",
+                    emoji="🌈",
+                    description="Enter your own RGB HEX colour"
+                )
+            ]
+
+        else:
+            options = [
+                discord.SelectOption(
+                    label="Cyan",
+                    value="cyan",
+                    emoji="🩵",
+                    description="#00FFFF"
+                ),
+                discord.SelectOption(
+                    label="Magenta",
+                    value="magenta",
+                    emoji="🟣",
+                    description="#FF00FF"
+                ),
+                discord.SelectOption(
+                    label="Yellow",
+                    value="yellow",
+                    emoji="🟡",
+                    description="#FFFF00"
+                ),
+                discord.SelectOption(
+                    label="Custom HEX",
+                    value="custom",
+                    emoji="🎨",
+                    description="Enter your own RGB HEX colour"
+                )
+            ]
+
+        super().__init__(
+            placeholder=f"Choose colour {number} of {amount}",
+            min_values=1,
+            max_values=1,
+            options=options
+        )
+
+    async def callback(
+        self,
+        interaction: discord.Interaction
+    ):
+        selected = self.values[0]
+
+        colour_values = {
+            "red": (
+                "🔴 Red",
+                (255, 0, 0)
+            ),
+            "green": (
+                "🟢 Green",
+                (0, 255, 0)
+            ),
+            "blue": (
+                "🔵 Blue",
+                (0, 0, 255)
+            ),
+            "cyan": (
+                "🩵 Cyan",
+                (0, 255, 255)
+            ),
+            "magenta": (
+                "🟣 Magenta",
+                (255, 0, 255)
+            ),
+            "yellow": (
+                "🟡 Yellow",
+                (255, 255, 0)
+            )
+        }
+
+        if selected == "custom":
+            modal = CustomHexModal(
+                self.player_id,
+                self.mode,
+                self.amount,
+                self.selected_colours.copy(),
+                interaction.message
+            )
+
+            await interaction.response.send_modal(modal)
+            return
+
+        name, rgb = colour_values[selected]
+
+        new_colours = self.selected_colours.copy()
+
+        new_colours.append(
+            {
+                "name": name,
+                "rgb": rgb
+            }
+        )
+
+        await continue_colour_game(
+            interaction,
+            self.player_id,
+            self.mode,
+            self.amount,
+            new_colours
+        )
+
+
+class ColourSelectionView(ColourGameView):
+    def __init__(
+        self,
+        player_id,
+        mode,
+        amount,
+        selected_colours
+    ):
+        super().__init__(player_id)
+
+        self.add_item(
+            ColourSelect(
+                player_id,
+                mode,
+                amount,
+                selected_colours
+            )
+        )
+
+
+# --------------------------------------------------
+# Custom HEX modal
+# --------------------------------------------------
+
+class CustomHexModal(discord.ui.Modal):
+    def __init__(
+        self,
+        player_id,
+        mode,
+        amount,
+        selected_colours,
+        message
+    ):
+        super().__init__(
+            title="Custom HEX Colour"
+        )
+
+        self.player_id = player_id
+        self.mode = mode
+        self.amount = amount
+        self.selected_colours = selected_colours
+        self.message = message
+
+        self.hex_input = discord.ui.TextInput(
+            label="RGB HEX",
+            placeholder="#65C6F1",
+            min_length=6,
+            max_length=7,
+            required=True
+        )
+
+        self.add_item(self.hex_input)
+
+    async def on_submit(
+        self,
+        interaction: discord.Interaction
+    ):
+        if interaction.user.id != self.player_id:
+            await interaction.response.send_message(
+                "This colour game belongs to another player.",
+                ephemeral=True
+            )
+            return
+
+        rgb = hex_to_rgb(
+            self.hex_input.value
+        )
+
+        if rgb is None:
+            await interaction.response.send_message(
+                "Invalid HEX colour. Use something like `#65C6F1`.",
+                ephemeral=True
+            )
+            return
+
+        hex_value = rgb_to_hex(rgb)
+
+        new_colours = self.selected_colours.copy()
+
+        new_colours.append(
+            {
+                "name": f"🎨 {hex_value}",
+                "rgb": rgb
+            }
+        )
+
+        await interaction.response.send_message(
+            f"Added {hex_value}.",
+            ephemeral=True
+        )
+
+        await continue_colour_game_from_modal(
+            self.message,
+            self.player_id,
+            self.mode,
+            self.amount,
+            new_colours
+        )
+
+
+# --------------------------------------------------
+# Continue / Result
+# --------------------------------------------------
+
+async def continue_colour_game(
+    interaction,
+    player_id,
+    mode,
+    amount,
+    selected_colours
+):
+    if len(selected_colours) >= amount:
+        embed = make_result_embed(
+            mode,
+            selected_colours
+        )
+
+        await interaction.response.edit_message(
+            embed=embed,
+            view=PlayAgainView(player_id)
+        )
+
+        return
+
+    embed = make_selection_embed(
+        mode,
+        amount,
+        selected_colours
+    )
+
+    await interaction.response.edit_message(
+        embed=embed,
+        view=ColourSelectionView(
+            player_id,
+            mode,
+            amount,
+            selected_colours
+        )
+    )
+
+
+async def continue_colour_game_from_modal(
+    message,
+    player_id,
+    mode,
+    amount,
+    selected_colours
+):
+    if len(selected_colours) >= amount:
+        embed = make_result_embed(
+            mode,
+            selected_colours
+        )
+
+        await message.edit(
+            embed=embed,
+            view=PlayAgainView(player_id)
+        )
+
+        return
+
+    embed = make_selection_embed(
+        mode,
+        amount,
+        selected_colours
+    )
+
+    await message.edit(
+        embed=embed,
+        view=ColourSelectionView(
+            player_id,
+            mode,
+            amount,
+            selected_colours
+        )
+    )
+
+
+def make_selection_embed(
+    mode,
+    amount,
+    selected_colours
+):
+    if mode == "additive":
+        title = "🌈 Additive RGB"
+        choices = "🔴 Red • 🟢 Green • 🔵 Blue • 🎨 Custom HEX"
+        embed_colour = discord.Color.blue()
+
+    else:
+        title = "🎨 Subtractive CMY"
+        choices = "🩵 Cyan • 🟣 Magenta • 🟡 Yellow • 🎨 Custom HEX"
+        embed_colour = discord.Color.magenta()
+
+    selected_text = ""
+
+    if selected_colours:
+        selected_text = "\n\n**Selected:**\n"
+
+        for number, colour in enumerate(
+            selected_colours,
+            start=1
+        ):
+            selected_text += (
+                f"{number}. {colour['name']} "
+                f"`{rgb_to_hex(colour['rgb'])}`\n"
+            )
+
+    next_number = len(selected_colours) + 1
+
+    return discord.Embed(
+        title=title,
+        description=(
+            f"Mixing **{amount} colours**.\n\n"
+            f"{choices}"
+            f"{selected_text}\n"
+            f"Choose **colour {next_number} of {amount}**."
+        ),
+        color=embed_colour
+    )
+
+
+def make_result_embed(
+    mode,
+    selected_colours
+):
+    rgb_values = [
+        colour["rgb"]
+        for colour in selected_colours
+    ]
+
+    if mode == "additive":
+        result = mix_additive(
+            rgb_values
+        )
+        system_name = "Additive RGB 🌈"
+
+    else:
+        result = mix_subtractive(
+            rgb_values
+        )
+        system_name = "Subtractive CMY 🎨"
+
+    result_hex = rgb_to_hex(result)
+
+    r, g, b = result
+
+    colour_int = (
+        (r << 16)
+        + (g << 8)
+        + b
+    )
+
+    mixed_text = " + ".join(
+        colour["name"]
+        for colour in selected_colours
+    )
+
+    embed = discord.Embed(
+        title="🎨 Colour Mix Result",
+        description=(
+            f"**{system_name}**\n\n"
+            f"{mixed_text}\n\n"
+            f"➡️ **{colour_name(result)}**\n\n"
+            f"**RGB:** `{r}, {g}, {b}`\n"
+            f"**HEX:** `{result_hex}`"
+        ),
+        color=discord.Color(colour_int)
+    )
+
+    embed.set_footer(
+        text="The colour bar on the left shows the resulting colour."
+    )
+
+    return embed
+
+
+# --------------------------------------------------
+# Play again
+# --------------------------------------------------
+
+class PlayAgainView(ColourGameView):
+    @discord.ui.button(
+        label="Mix Again",
+        emoji="🔄",
+        style=discord.ButtonStyle.success
+    )
+    async def play_again(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        embed = discord.Embed(
+            title="🎨 Colour Mix",
+            description=(
+                "Choose a colour mixing system.\n\n"
+                "🌈 **Additive RGB**\n"
+                "Red • Green • Blue\n\n"
+                "🎨 **Subtractive CMY**\n"
+                "Cyan • Magenta • Yellow"
+            ),
+            color=discord.Color.blurple()
+        )
+
+        await interaction.response.edit_message(
+            embed=embed,
+            view=ColourModelView(
+                self.player_id
+            )
+        )
+
+
+# --------------------------------------------------
+# /game colour command
+# --------------------------------------------------
+
+@game_group.command(
+    name="colour",
+    description="Mix colours using additive RGB or subtractive CMY"
+)
+async def game_colour(
+    interaction: discord.Interaction
+):
+    embed = discord.Embed(
+        title="🎨 Colour Mix",
+        description=(
+            "Choose a colour mixing system.\n\n"
+            "🌈 **Additive RGB**\n"
+            "🔴 Red • 🟢 Green • 🔵 Blue\n\n"
+            "🎨 **Subtractive CMY**\n"
+            "🩵 Cyan • 🟣 Magenta • 🟡 Yellow"
+        ),
+        color=discord.Color.blurple()
+    )
+
+    # Private acknowledgement so Discord does not publicly show
+    # who used /game colour.
+    await interaction.response.send_message(
+        "🎨 Colour Mix started.",
+        ephemeral=True
+    )
+
+    # Public interactive game
+    await interaction.channel.send(
+        embed=embed,
+        view=ColourModelView(
+            interaction.user.id
+        )
+    )
+
+
+bot.tree.add_command(game_group)
 
 
 # --------------------------------------------------
