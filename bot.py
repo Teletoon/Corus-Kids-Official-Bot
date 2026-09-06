@@ -107,73 +107,13 @@ say_group = app_commands.Group(
 # /say text
 # --------------------------------------------------
 
-class SayTextModal(discord.ui.Modal):
-    def __init__(
-        self,
-        channel,
-        color: Optional[app_commands.Choice[str]] = None
-    ):
-        super().__init__(
-            title="Send Message"
-        )
-
-        self.channel = channel
-        self.color = color
-
-        self.text_input = discord.ui.TextInput(
-            label="Message",
-            style=discord.TextStyle.paragraph,
-            placeholder="Write your message here...",
-            required=True,
-            max_length=2000
-        )
-
-        self.add_item(self.text_input)
-
-    async def on_submit(
-        self,
-        interaction: discord.Interaction
-    ):
-        allowed_mentions = discord.AllowedMentions(
-            users=True,
-            roles=False,
-            everyone=False
-        )
-
-        text = self.text_input.value
-
-        if self.color:
-            colors = {
-                "blue": discord.Color.blue(),
-                "red": discord.Color.red(),
-                "green": discord.Color.green()
-            }
-
-            embed = discord.Embed(
-                description=text,
-                color=colors[self.color.value]
-            )
-
-            await self.channel.send(
-                embed=embed,
-                allowed_mentions=allowed_mentions
-            )
-
-        else:
-            await self.channel.send(
-                text,
-                allowed_mentions=allowed_mentions
-            )
-
-        await interaction.response.send_message(
-            "Message sent.",
-            ephemeral=True
-        )
-
-
 @say_group.command(
     name="text",
     description="Send a text message"
+)
+@app_commands.describe(
+    text="Message to send",
+    color="Optional — choose a colour or leave empty for normal text"
 )
 @app_commands.choices(
     color=[
@@ -184,14 +124,42 @@ class SayTextModal(discord.ui.Modal):
 )
 async def say_text(
     interaction: discord.Interaction,
+    text: str,
     color: Optional[app_commands.Choice[str]] = None
 ):
-    modal = SayTextModal(
-        interaction.channel,
-        color
+    allowed_mentions = discord.AllowedMentions(
+        users=True,
+        roles=False,
+        everyone=False
     )
 
-    await interaction.response.send_modal(modal)
+    if color:
+        colors = {
+            "blue": discord.Color.blue(),
+            "red": discord.Color.red(),
+            "green": discord.Color.green()
+        }
+
+        embed = discord.Embed(
+            description=text,
+            color=colors[color.value]
+        )
+
+        await interaction.channel.send(
+            embed=embed,
+            allowed_mentions=allowed_mentions
+        )
+
+    else:
+        await interaction.channel.send(
+            text,
+            allowed_mentions=allowed_mentions
+        )
+
+    await interaction.response.send_message(
+        "Message sent.",
+        ephemeral=True
+    )  
 
 
 # --------------------------------------------------
@@ -938,44 +906,30 @@ game_group = app_commands.Group(
 
 
 # --------------------------------------------------
-# Colour calculation
+# Colour helpers
 # --------------------------------------------------
-
-def hex_to_rgb(hex_value: str):
-    value = hex_value.strip().upper()
-
-    if value.startswith("#"):
-        value = value[1:]
-
-    if len(value) != 6:
-        return None
-
-    try:
-        r = int(value[0:2], 16)
-        g = int(value[2:4], 16)
-        b = int(value[4:6], 16)
-
-        return (r, g, b)
-
-    except ValueError:
-        return None
-
 
 def rgb_to_hex(rgb):
     r, g, b = rgb
     return f"#{r:02X}{g:02X}{b:02X}"
 
 
+def colour_name(rgb):
+    known_colours = {
+        (255, 0, 0): "Red 🔴",
+        (0, 255, 0): "Green 🟢",
+        (0, 0, 255): "Blue 🔵",
+        (0, 255, 255): "Cyan 🩵",
+        (255, 0, 255): "Magenta 🟣",
+        (255, 255, 0): "Yellow 🟡",
+        (255, 255, 255): "White ⚪",
+        (0, 0, 0): "Black ⚫"
+    }
+
+    return known_colours.get(rgb, "Colour 🎨")
+
+
 def mix_additive(colours):
-    """
-    Additive RGB mixing.
-
-    Red + Green = Yellow
-    Green + Blue = Cyan
-    Red + Blue = Magenta
-    Red + Green + Blue = White
-    """
-
     r = min(255, sum(colour[0] for colour in colours))
     g = min(255, sum(colour[1] for colour in colours))
     b = min(255, sum(colour[2] for colour in colours))
@@ -984,15 +938,6 @@ def mix_additive(colours):
 
 
 def mix_subtractive(colours):
-    """
-    Subtractive CMY mixing.
-
-    Cyan + Yellow = Green
-    Cyan + Magenta = Blue
-    Magenta + Yellow = Red
-    Cyan + Magenta + Yellow = Black
-    """
-
     cyan_total = 0
     magenta_total = 0
     yellow_total = 0
@@ -1013,25 +958,8 @@ def mix_subtractive(colours):
     return (r, g, b)
 
 
-def colour_name(rgb):
-    known_colours = {
-        (255, 0, 0): "Red 🔴",
-        (0, 255, 0): "Green 🟢",
-        (0, 0, 255): "Blue 🔵",
-
-        (0, 255, 255): "Cyan 🩵",
-        (255, 0, 255): "Magenta 🟣",
-        (255, 255, 0): "Yellow 🟡",
-
-        (255, 255, 255): "White ⚪",
-        (0, 0, 0): "Black ⚫"
-    }
-
-    return known_colours.get(rgb, "Custom Colour 🎨")
-
-
 # --------------------------------------------------
-# Base game view
+# Base view
 # --------------------------------------------------
 
 class ColourGameView(discord.ui.View):
@@ -1054,10 +982,11 @@ class ColourGameView(discord.ui.View):
 
 
 # --------------------------------------------------
-# Choose RGB or CMY
+# Choose Additive or Subtractive
 # --------------------------------------------------
 
 class ColourModelView(ColourGameView):
+
     @discord.ui.button(
         label="Additive RGB",
         emoji="🌈",
@@ -1069,14 +998,12 @@ class ColourModelView(ColourGameView):
         button: discord.ui.Button
     ):
         embed = discord.Embed(
-            title="🎨 Colour Mix — Additive RGB",
+            title="🌈 Additive RGB",
             description=(
-                "Choose how many colours you want to mix.\n\n"
-                "🔴 Red\n"
-                "🟢 Green\n"
-                "🔵 Blue\n"
-                "🎨 Custom HEX\n\n"
-                "**The same colour can be selected more than once.**"
+                "Choose how many **different colours** you want to mix.\n\n"
+                "🔴 Red `#FF0000`\n"
+                "🟢 Green `#00FF00`\n"
+                "🔵 Blue `#0000FF`"
             ),
             color=discord.Color.blue()
         )
@@ -1085,7 +1012,7 @@ class ColourModelView(ColourGameView):
             embed=embed,
             view=ColourAmountView(
                 self.player_id,
-                mode="additive"
+                "additive"
             )
         )
 
@@ -1100,14 +1027,12 @@ class ColourModelView(ColourGameView):
         button: discord.ui.Button
     ):
         embed = discord.Embed(
-            title="🎨 Colour Mix — Subtractive CMY",
+            title="🎨 Subtractive CMY",
             description=(
-                "Choose how many colours you want to mix.\n\n"
-                "🩵 Cyan\n"
-                "🟣 Magenta\n"
-                "🟡 Yellow\n"
-                "🎨 Custom HEX\n\n"
-                "**The same colour can be selected more than once.**"
+                "Choose how many **different colours** you want to mix.\n\n"
+                "🩵 Cyan `#00FFFF`\n"
+                "🟣 Magenta `#FF00FF`\n"
+                "🟡 Yellow `#FFFF00`"
             ),
             color=discord.Color.magenta()
         )
@@ -1116,7 +1041,7 @@ class ColourModelView(ColourGameView):
             embed=embed,
             view=ColourAmountView(
                 self.player_id,
-                mode="subtractive"
+                "subtractive"
             )
         )
 
@@ -1193,7 +1118,7 @@ async def start_colour_selection(
 
 
 # --------------------------------------------------
-# Colour selection menu
+# Colour select menu
 # --------------------------------------------------
 
 class ColourSelect(discord.ui.Select):
@@ -1209,63 +1134,39 @@ class ColourSelect(discord.ui.Select):
         self.amount = amount
         self.selected_colours = selected_colours
 
-        number = len(selected_colours) + 1
+        already_selected = {
+            colour["value"]
+            for colour in selected_colours
+        }
 
         if mode == "additive":
-            options = [
-                discord.SelectOption(
-                    label="Red",
-                    value="red",
-                    emoji="🔴",
-                    description="#FF0000"
-                ),
-                discord.SelectOption(
-                    label="Green",
-                    value="green",
-                    emoji="🟢",
-                    description="#00FF00"
-                ),
-                discord.SelectOption(
-                    label="Blue",
-                    value="blue",
-                    emoji="🔵",
-                    description="#0000FF"
-                ),
-                discord.SelectOption(
-                    label="Custom HEX",
-                    value="custom",
-                    emoji="🌈",
-                    description="Enter your own RGB HEX colour"
-                )
+            all_options = [
+                ("Red", "red", "🔴", "#FF0000"),
+                ("Green", "green", "🟢", "#00FF00"),
+                ("Blue", "blue", "🔵", "#0000FF")
             ]
 
         else:
-            options = [
-                discord.SelectOption(
-                    label="Cyan",
-                    value="cyan",
-                    emoji="🩵",
-                    description="#00FFFF"
-                ),
-                discord.SelectOption(
-                    label="Magenta",
-                    value="magenta",
-                    emoji="🟣",
-                    description="#FF00FF"
-                ),
-                discord.SelectOption(
-                    label="Yellow",
-                    value="yellow",
-                    emoji="🟡",
-                    description="#FFFF00"
-                ),
-                discord.SelectOption(
-                    label="Custom HEX",
-                    value="custom",
-                    emoji="🎨",
-                    description="Enter your own RGB HEX colour"
-                )
+            all_options = [
+                ("Cyan", "cyan", "🩵", "#00FFFF"),
+                ("Magenta", "magenta", "🟣", "#FF00FF"),
+                ("Yellow", "yellow", "🟡", "#FFFF00")
             ]
+
+        options = []
+
+        for label, value, emoji, hex_value in all_options:
+            if value not in already_selected:
+                options.append(
+                    discord.SelectOption(
+                        label=label,
+                        value=value,
+                        emoji=emoji,
+                        description=hex_value
+                    )
+                )
+
+        number = len(selected_colours) + 1
 
         super().__init__(
             placeholder=f"Choose colour {number} of {amount}",
@@ -1281,52 +1182,41 @@ class ColourSelect(discord.ui.Select):
         selected = self.values[0]
 
         colour_values = {
-            "red": (
-                "🔴 Red",
-                (255, 0, 0)
-            ),
-            "green": (
-                "🟢 Green",
-                (0, 255, 0)
-            ),
-            "blue": (
-                "🔵 Blue",
-                (0, 0, 255)
-            ),
-            "cyan": (
-                "🩵 Cyan",
-                (0, 255, 255)
-            ),
-            "magenta": (
-                "🟣 Magenta",
-                (255, 0, 255)
-            ),
-            "yellow": (
-                "🟡 Yellow",
-                (255, 255, 0)
-            )
+            "red": {
+                "name": "🔴 Red",
+                "rgb": (255, 0, 0)
+            },
+            "green": {
+                "name": "🟢 Green",
+                "rgb": (0, 255, 0)
+            },
+            "blue": {
+                "name": "🔵 Blue",
+                "rgb": (0, 0, 255)
+            },
+            "cyan": {
+                "name": "🩵 Cyan",
+                "rgb": (0, 255, 255)
+            },
+            "magenta": {
+                "name": "🟣 Magenta",
+                "rgb": (255, 0, 255)
+            },
+            "yellow": {
+                "name": "🟡 Yellow",
+                "rgb": (255, 255, 0)
+            }
         }
 
-        if selected == "custom":
-            modal = CustomHexModal(
-                self.player_id,
-                self.mode,
-                self.amount,
-                self.selected_colours.copy(),
-                interaction.message
-            )
-
-            await interaction.response.send_modal(modal)
-            return
-
-        name, rgb = colour_values[selected]
+        colour = colour_values[selected]
 
         new_colours = self.selected_colours.copy()
 
         new_colours.append(
             {
-                "name": name,
-                "rgb": rgb
+                "value": selected,
+                "name": colour["name"],
+                "rgb": colour["rgb"]
             }
         )
 
@@ -1360,87 +1250,7 @@ class ColourSelectionView(ColourGameView):
 
 
 # --------------------------------------------------
-# Custom HEX modal
-# --------------------------------------------------
-
-class CustomHexModal(discord.ui.Modal):
-    def __init__(
-        self,
-        player_id,
-        mode,
-        amount,
-        selected_colours,
-        message
-    ):
-        super().__init__(
-            title="Custom HEX Colour"
-        )
-
-        self.player_id = player_id
-        self.mode = mode
-        self.amount = amount
-        self.selected_colours = selected_colours
-        self.message = message
-
-        self.hex_input = discord.ui.TextInput(
-            label="RGB HEX",
-            placeholder="#65C6F1",
-            min_length=6,
-            max_length=7,
-            required=True
-        )
-
-        self.add_item(self.hex_input)
-
-    async def on_submit(
-        self,
-        interaction: discord.Interaction
-    ):
-        if interaction.user.id != self.player_id:
-            await interaction.response.send_message(
-                "This colour game belongs to another player.",
-                ephemeral=True
-            )
-            return
-
-        rgb = hex_to_rgb(
-            self.hex_input.value
-        )
-
-        if rgb is None:
-            await interaction.response.send_message(
-                "Invalid HEX colour. Use something like `#65C6F1`.",
-                ephemeral=True
-            )
-            return
-
-        hex_value = rgb_to_hex(rgb)
-
-        new_colours = self.selected_colours.copy()
-
-        new_colours.append(
-            {
-                "name": f"🎨 {hex_value}",
-                "rgb": rgb
-            }
-        )
-
-        await interaction.response.send_message(
-            f"Added {hex_value}.",
-            ephemeral=True
-        )
-
-        await continue_colour_game_from_modal(
-            self.message,
-            self.player_id,
-            self.mode,
-            self.amount,
-            new_colours
-        )
-
-
-# --------------------------------------------------
-# Continue / Result
+# Continue game
 # --------------------------------------------------
 
 async def continue_colour_game(
@@ -1460,7 +1270,6 @@ async def continue_colour_game(
             embed=embed,
             view=PlayAgainView(player_id)
         )
-
         return
 
     embed = make_selection_embed(
@@ -1480,42 +1289,9 @@ async def continue_colour_game(
     )
 
 
-async def continue_colour_game_from_modal(
-    message,
-    player_id,
-    mode,
-    amount,
-    selected_colours
-):
-    if len(selected_colours) >= amount:
-        embed = make_result_embed(
-            mode,
-            selected_colours
-        )
-
-        await message.edit(
-            embed=embed,
-            view=PlayAgainView(player_id)
-        )
-
-        return
-
-    embed = make_selection_embed(
-        mode,
-        amount,
-        selected_colours
-    )
-
-    await message.edit(
-        embed=embed,
-        view=ColourSelectionView(
-            player_id,
-            mode,
-            amount,
-            selected_colours
-        )
-    )
-
+# --------------------------------------------------
+# Selection embed
+# --------------------------------------------------
 
 def make_selection_embed(
     mode,
@@ -1524,12 +1300,20 @@ def make_selection_embed(
 ):
     if mode == "additive":
         title = "🌈 Additive RGB"
-        choices = "🔴 Red • 🟢 Green • 🔵 Blue • 🎨 Custom HEX"
+        choices = (
+            "🔴 Red `#FF0000`\n"
+            "🟢 Green `#00FF00`\n"
+            "🔵 Blue `#0000FF`"
+        )
         embed_colour = discord.Color.blue()
 
     else:
         title = "🎨 Subtractive CMY"
-        choices = "🩵 Cyan • 🟣 Magenta • 🟡 Yellow • 🎨 Custom HEX"
+        choices = (
+            "🩵 Cyan `#00FFFF`\n"
+            "🟣 Magenta `#FF00FF`\n"
+            "🟡 Yellow `#FFFF00`"
+        )
         embed_colour = discord.Color.magenta()
 
     selected_text = ""
@@ -1551,14 +1335,18 @@ def make_selection_embed(
     return discord.Embed(
         title=title,
         description=(
-            f"Mixing **{amount} colours**.\n\n"
+            f"Mixing **{amount} different colours**.\n\n"
             f"{choices}"
-            f"{selected_text}\n"
+            f"{selected_text}\n\n"
             f"Choose **colour {next_number} of {amount}**."
         ),
         color=embed_colour
     )
 
+
+# --------------------------------------------------
+# Result embed
+# --------------------------------------------------
 
 def make_result_embed(
     mode,
@@ -1570,15 +1358,11 @@ def make_result_embed(
     ]
 
     if mode == "additive":
-        result = mix_additive(
-            rgb_values
-        )
+        result = mix_additive(rgb_values)
         system_name = "Additive RGB 🌈"
 
     else:
-        result = mix_subtractive(
-            rgb_values
-        )
+        result = mix_subtractive(rgb_values)
         system_name = "Subtractive CMY 🎨"
 
     result_hex = rgb_to_hex(result)
@@ -1608,18 +1392,15 @@ def make_result_embed(
         color=discord.Color(colour_int)
     )
 
-    embed.set_footer(
-        text="The colour bar on the left shows the resulting colour."
-    )
-
     return embed
 
 
 # --------------------------------------------------
-# Play again
+# Mix again
 # --------------------------------------------------
 
 class PlayAgainView(ColourGameView):
+
     @discord.ui.button(
         label="Mix Again",
         emoji="🔄",
@@ -1635,9 +1416,9 @@ class PlayAgainView(ColourGameView):
             description=(
                 "Choose a colour mixing system.\n\n"
                 "🌈 **Additive RGB**\n"
-                "Red • Green • Blue\n\n"
+                "🔴 Red • 🟢 Green • 🔵 Blue\n\n"
                 "🎨 **Subtractive CMY**\n"
-                "Cyan • Magenta • Yellow"
+                "🩵 Cyan • 🟣 Magenta • 🟡 Yellow"
             ),
             color=discord.Color.blurple()
         )
@@ -1651,12 +1432,12 @@ class PlayAgainView(ColourGameView):
 
 
 # --------------------------------------------------
-# /game colour command
+# /game colour
 # --------------------------------------------------
 
 @game_group.command(
     name="colour",
-    description="Mix colours using additive RGB or subtractive CMY"
+    description="Mix basic additive RGB or subtractive CMY colours"
 )
 async def game_colour(
     interaction: discord.Interaction
@@ -1668,19 +1449,17 @@ async def game_colour(
             "🌈 **Additive RGB**\n"
             "🔴 Red • 🟢 Green • 🔵 Blue\n\n"
             "🎨 **Subtractive CMY**\n"
-            "🩵 Cyan • 🟣 Magenta • 🟡 Yellow"
+            "🩵 Cyan • 🟣 Magenta • 🟡 Yellow\n\n"
+            "Mix **2 different colours** or **all 3 colours**."
         ),
         color=discord.Color.blurple()
     )
 
-    # Private acknowledgement so Discord does not publicly show
-    # who used /game colour.
     await interaction.response.send_message(
         "🎨 Colour Mix started.",
         ephemeral=True
     )
 
-    # Public interactive game
     await interaction.channel.send(
         embed=embed,
         view=ColourModelView(
@@ -1690,7 +1469,6 @@ async def game_colour(
 
 
 bot.tree.add_command(game_group)
-
 
 # --------------------------------------------------
 # ERROR HANDLER
