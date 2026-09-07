@@ -551,7 +551,7 @@ async def jail(
         await interaction.channel.send(
             f"⛓️ {user.mention} is jailed to **{jail_name}**.\n"
             f"Duration: **{duration}**\n"
-            f"Reason: **{reason or 'No reason provided'}**",
+            f"Reason: {reason or 'No reason provided'}",
             allowed_mentions=discord.AllowedMentions(
                 users=True,
                 roles=False,
