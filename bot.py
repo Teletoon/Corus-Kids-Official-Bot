@@ -992,8 +992,8 @@ async def help_command(
     embed.add_field(
         name="👤 Server & User",
         value=(
-	    "**/server-icon** — Show the server's icon."
-             "**/avatar** — Show a user's avatar.\n"
+	    "**/server-icon** — Show the server's icon.\n"
+             "**/avatar** — Show a user's avatar."
         ),
         inline=False
     )
