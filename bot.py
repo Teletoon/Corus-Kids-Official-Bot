@@ -302,6 +302,7 @@ async def edit_message(
             ephemeral=True
         )
 
+
 # --------------------------------------------------
 # /warn
 # --------------------------------------------------
@@ -650,9 +651,8 @@ async def kick(
     description="Ban a user inside or outside the server."
 )
 @app_commands.describe(
+    user="Username or User ID",
     reason="Reason for the ban",
-    user="Select a member currently in the server",
-    user_id="Discord User ID if the user is not in the server",
     delete_messages="Delete message history"
 )
 @app_commands.choices(
@@ -678,27 +678,10 @@ async def kick(
 @app_commands.checks.has_permissions(ban_members=True)
 async def ban(
     interaction: discord.Interaction,
+    user: str,
     reason: str,
-    user: Optional[discord.Member] = None,
-    user_id: Optional[str] = None,
     delete_messages: Optional[app_commands.Choice[int]] = None
 ):
-    # Must provide either user or user_id
-    if user is None and user_id is None:
-        await interaction.response.send_message(
-            "❌ Select a member or enter a Discord User ID.",
-            ephemeral=True
-        )
-        return
-
-    # Don't allow both
-    if user is not None and user_id is not None:
-        await interaction.response.send_message(
-            "❌ Use either **user** or **user_id**, not both.",
-            ephemeral=True
-        )
-        return
-
     await interaction.response.defer(
         ephemeral=True
     )
@@ -709,47 +692,80 @@ async def ban(
         else 0
     )
 
+    guild = interaction.guild
+
     try:
+        target = None
+
         # ------------------------------------------
-        # Member currently in the server
+        # Remove mention formatting if someone uses
+        # <@123456789> or <@!123456789>
         # ------------------------------------------
 
-        if user is not None:
-            target = user
-            user_name = str(user)
+        cleaned_user = (
+            user.strip()
+            .replace("<@", "")
+            .replace("!>", "")
+            .replace(">", "")
+        )
 
-        # Pre-Ban / User outside the server
+        # ------------------------------------------
+        # User ID
+        # Works for members inside OR outside server
+        # ------------------------------------------
+
+        if cleaned_user.isdigit():
+            user_id = int(cleaned_user)
+
+            # Try server member first
+            target = guild.get_member(user_id)
+
+            # If not in server, fetch Discord user
+            if target is None:
+                target = await bot.fetch_user(user_id)
+
+        # ------------------------------------------
+        # Username / display name
+        # Only works if member is currently in server
+        # ------------------------------------------
+
         else:
-            try:
-                target_id = int(user_id)
-            except ValueError:
+            search = cleaned_user.lower()
+
+            for member in guild.members:
+                if (
+                    member.name.lower() == search
+                    or member.display_name.lower() == search
+                    or str(member).lower() == search
+                ):
+                    target = member
+                    break
+
+            if target is None:
                 await interaction.followup.send(
-                    "❌ Invalid Discord User ID.",
+                    "❌ I couldn't find that username in this server.\n"
+                    "If the user is not in the server, enter their **User ID**.",
                     ephemeral=True
                 )
                 return
 
-            target = await bot.fetch_user(
-                target_id
-            )
-
-            user_name = str(target)
-
+        # ------------------------------------------
         # Ban
+        # ------------------------------------------
 
-        await interaction.guild.ban(
+        user_name = str(target)
+
+        await guild.ban(
             target,
             reason=reason,
             delete_message_seconds=delete_seconds
         )
 
-        # Private confirmation
         await interaction.followup.send(
             "User banned.",
             ephemeral=True
         )
 
-        # Public CK Bot announcement
         await interaction.channel.send(
             f"🚫 **{user_name}** is banned.\n"
             f"Reason: **{reason}**"
@@ -757,7 +773,7 @@ async def ban(
 
     except discord.NotFound:
         await interaction.followup.send(
-            "❌ I could not find a Discord account with that User ID.",
+            "❌ I couldn't find a Discord account with that User ID.",
             ephemeral=True
         )
 
@@ -1574,6 +1590,7 @@ async def game_colour(
 
 
 bot.tree.add_command(game_group)
+
 
 # --------------------------------------------------
 # ERROR HANDLER
