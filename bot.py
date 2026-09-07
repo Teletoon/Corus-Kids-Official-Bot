@@ -682,9 +682,7 @@ async def ban(
     reason: str,
     delete_messages: Optional[app_commands.Choice[int]] = None
 ):
-    await interaction.response.defer(
-        ephemeral=True
-    )
+    await interaction.response.defer(ephemeral=True)
 
     delete_seconds = (
         delete_messages.value
@@ -696,41 +694,31 @@ async def ban(
 
     try:
         target = None
+        entered_user = user.strip()
 
-        # ------------------------------------------
-        # Remove mention formatting if someone uses
-        # <@123456789> or <@!123456789>
-        # ------------------------------------------
+        # User mention
+        if entered_user.startswith("<@") and entered_user.endswith(">"):
+            entered_user = (
+                entered_user
+                .replace("<@", "")
+                .replace("!", "")
+                .replace(">", "")
+            )
 
-        cleaned_user = (
-            user.strip()
-            .replace("<@", "")
-            .replace("!>", "")
-            .replace(">", "")
-        )
-
-        # ------------------------------------------
         # User ID
-        # Works for members inside OR outside server
-        # ------------------------------------------
+        if entered_user.isdigit():
+            user_id = int(entered_user)
 
-        if cleaned_user.isdigit():
-            user_id = int(cleaned_user)
-
-            # Try server member first
+            # First check if they're currently in the server
             target = guild.get_member(user_id)
 
-            # If not in server, fetch Discord user
+            # If not, fetch their Discord account
             if target is None:
                 target = await bot.fetch_user(user_id)
 
-        # ------------------------------------------
-        # Username / display name
-        # Only works if member is currently in server
-        # ------------------------------------------
-
+        # Username
         else:
-            search = cleaned_user.lower()
+            search = entered_user.lower()
 
             for member in guild.members:
                 if (
@@ -743,15 +731,11 @@ async def ban(
 
             if target is None:
                 await interaction.followup.send(
-                    "❌ I couldn't find that username in this server.\n"
-                    "If the user is not in the server, enter their **User ID**.",
+                    "❌ I couldn't find that username in this server. "
+                    "If the user is outside the server, use their User ID.",
                     ephemeral=True
                 )
                 return
-
-        # ------------------------------------------
-        # Ban
-        # ------------------------------------------
 
         user_name = str(target)
 
@@ -779,7 +763,7 @@ async def ban(
 
     except discord.Forbidden:
         await interaction.followup.send(
-            "❌ I cannot ban this user. Check my **Ban Members** "
+            "❌ I cannot ban this user. Check my Ban Members "
             "permission and role position.",
             ephemeral=True
         )
