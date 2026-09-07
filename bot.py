@@ -647,55 +647,130 @@ async def kick(
 
 @bot.tree.command(
     name="ban",
-    description="Ban a user."
+    description="Ban a user inside or outside the server."
 )
 @app_commands.describe(
-    user="User to ban",
     reason="Reason for the ban",
+    user="Select a member currently in the server",
+    user_id="Discord User ID if the user is not in the server",
     delete_messages="Delete message history"
 )
 @app_commands.choices(
     delete_messages=[
-        app_commands.Choice(name="Don't delete messages", value=0),
-        app_commands.Choice(name="1 day", value=86400),
-        app_commands.Choice(name="3 days", value=259200),
-        app_commands.Choice(name="7 days", value=604800)
+        app_commands.Choice(
+            name="Don't delete messages",
+            value=0
+        ),
+        app_commands.Choice(
+            name="1 day",
+            value=86400
+        ),
+        app_commands.Choice(
+            name="3 days",
+            value=259200
+        ),
+        app_commands.Choice(
+            name="7 days",
+            value=604800
+        )
     ]
 )
 @app_commands.checks.has_permissions(ban_members=True)
 async def ban(
     interaction: discord.Interaction,
-    user: discord.Member,
     reason: str,
+    user: Optional[discord.Member] = None,
+    user_id: Optional[str] = None,
     delete_messages: Optional[app_commands.Choice[int]] = None
 ):
-    # Default = don't delete messages
-    delete_seconds = delete_messages.value if delete_messages else 0
+    # Must provide either user or user_id
+    if user is None and user_id is None:
+        await interaction.response.send_message(
+            "❌ Select a member or enter a Discord User ID.",
+            ephemeral=True
+        )
+        return
+
+    # Don't allow both
+    if user is not None and user_id is not None:
+        await interaction.response.send_message(
+            "❌ Use either **user** or **user_id**, not both.",
+            ephemeral=True
+        )
+        return
+
+    await interaction.response.defer(
+        ephemeral=True
+    )
+
+    delete_seconds = (
+        delete_messages.value
+        if delete_messages
+        else 0
+    )
 
     try:
-        # Save username before banning
-        user_name = str(user)
+        # ------------------------------------------
+        # Member currently in the server
+        # ------------------------------------------
 
-        await user.ban(
+        if user is not None:
+            target = user
+            user_name = str(user)
+
+        # Pre-Ban / User outside the server
+        else:
+            try:
+                target_id = int(user_id)
+            except ValueError:
+                await interaction.followup.send(
+                    "❌ Invalid Discord User ID.",
+                    ephemeral=True
+                )
+                return
+
+            target = await bot.fetch_user(
+                target_id
+            )
+
+            user_name = str(target)
+
+        # Ban
+
+        await interaction.guild.ban(
+            target,
             reason=reason,
             delete_message_seconds=delete_seconds
         )
 
-        # Private confirmation to the moderator
-        await interaction.response.send_message(
+        # Private confirmation
+        await interaction.followup.send(
             "User banned.",
             ephemeral=True
         )
 
-        # Public announcement from CK Bot
+        # Public CK Bot announcement
         await interaction.channel.send(
             f"🚫 **{user_name}** is banned.\n"
             f"Reason: **{reason}**"
         )
 
+    except discord.NotFound:
+        await interaction.followup.send(
+            "❌ I could not find a Discord account with that User ID.",
+            ephemeral=True
+        )
+
     except discord.Forbidden:
-        await interaction.response.send_message(
-            "I cannot ban this user. Check my permissions and role position.",
+        await interaction.followup.send(
+            "❌ I cannot ban this user. Check my **Ban Members** "
+            "permission and role position.",
+            ephemeral=True
+        )
+
+    except discord.HTTPException as error:
+        await interaction.followup.send(
+            f"❌ Discord rejected the ban: `{error}`",
             ephemeral=True
         )
 
