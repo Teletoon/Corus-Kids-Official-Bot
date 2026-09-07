@@ -867,7 +867,7 @@ async def help_command(
             "Here is the list of available Corus Kids Bot commands.\n"
             "Some moderation commands require staff permissions."
         ),
-        color=discord.Color.blue()
+        color=discord.Color.green()
     )
 
     embed.add_field(
