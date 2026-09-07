@@ -549,8 +549,7 @@ async def jail(
 
         # Public announcement from CK Bot
         await interaction.channel.send(
-            f"⛓️ {user.mention} is jailed to **{jail_name}**.\n"
-            f"Duration: **{duration}**\n"
+            f"⛓️ {user.mention} is jailed to **{jail_name}** for **{duration}**.\n"
             f"Reason: {reason or 'No reason provided'}",
             allowed_mentions=discord.AllowedMentions(
                 users=True,
