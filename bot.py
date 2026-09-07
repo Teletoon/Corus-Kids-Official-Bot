@@ -951,7 +951,7 @@ async def help_command(
     embed.add_field(
         name="💬 Messages",
         value=(
-            "**/say text** — Send a message through Corus Kids Bot.\n"
+            "**/say text** — Send a text message through Corus Kids Bot.\n"
             "**/say image** — Send an image through Corus Kids Bot.\n"
             "**/edit-message** — Edit a message previously sent by Corus Kids Bot."
         ),
