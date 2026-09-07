@@ -426,7 +426,7 @@ async def remove_timeout(
 
         # Public message from CK Bot
         await interaction.channel.send(
-            f"🔊 **{user}** has been removed from timeout."
+            f"🔊 **{user}** is removed from timeout."
         )
 
     except discord.Forbidden:
@@ -801,7 +801,7 @@ async def unban(
 
         # Public announcement from CK Bot
         await interaction.channel.send(
-            f"✅ **{user}** has been unbanned."
+            f"✅ **{user}** is unbanned."
         )
 
     except ValueError:
