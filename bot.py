@@ -382,8 +382,7 @@ async def timeout(
 
         # Public message from CK Bot
         await interaction.channel.send(
-            f"⏱️ {user.mention} is timed out. "
-            f"**{duration}**.\n"
+            f"⏱️ {user.mention} is timed out for **{duration}**.\n"
             f"Reason: {reason or 'No reason provided.'}",
             allowed_mentions=discord.AllowedMentions(
                 users=True,
@@ -962,12 +961,12 @@ async def help_command(
         name="🛡️ Moderation",
         value=(
             "**/warn** — Warn a member for breaking a rule.\n"
-            "**/timeout** — Timeout a member for up to 1 week.\n"
+            "**/timeout** — Timeout a member up to 1 week.\n"
             "**/remove-timeout** — Remove a member's timeout.\n"
             "**/jail** — Jail a member to Cow Jail or Donkey Jail up to 30 days.\n"
             "**/kick** — Kick a member from the server.\n"
             "**/ban** — Ban a member from the server.\n"
-            "**/unban** — Unban a member using their Discord user ID.\n"
+            "**/unban** — Unban a member with their User ID.\n"
             "**/clear** — Delete 1–20 messages from a selected member."
         ),
         inline=False
