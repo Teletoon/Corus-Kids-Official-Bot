@@ -993,7 +993,7 @@ async def help_command(
         name="👤 Server & User",
         value=(
 	    "**/server-icon** — Show the server's icon."
-            "**/avatar** — Show a user's avatar.\n"
+             "**/avatar** — Show a user's avatar.\n"
         ),
         inline=False
     )
