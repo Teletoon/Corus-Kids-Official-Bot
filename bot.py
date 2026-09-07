@@ -830,7 +830,10 @@ async def clear(
         )
         return
 
-    await interaction.response.defer(ephemeral=False)
+    # Private acknowledgement — hides "used /clear"
+    await interaction.response.defer(
+        ephemeral=True
+    )
 
     messages = []
 
@@ -844,9 +847,9 @@ async def clear(
     for message in messages:
         await message.delete()
 
-    await interaction.followup.send(
-        f"🧹 Deleted **{len(messages)} message(s)** from **{member}**.",
-        ephemeral=False
+    # Public message sent normally by CK Bot
+    await interaction.channel.send(
+        f"🧹 Deleted **{len(messages)} message(s)** from **{member}**."
     )
 
 
